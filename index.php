@@ -1,384 +1,290 @@
 <?php
-
 /**
- * This sample app is provided to kickstart your experience using Facebook's
- * resources for developers.  This sample app provides examples of several
- * key concepts, including authentication, the Graph API, and FQL (Facebook
- * Query Language). Please visit the docs at 'developers.facebook.com/docs'
- * to learn more about the resources available to you
+ * @package     Extly.kApp
+ * @subpackage  ServerAuth - FacebookApp to authorize and grant permissions for the AutoTweet standard App or your own App
+ *
+ * @author      Prieco S.A. <support@extly.com>
+ * @copyright   Copyright (C) 2007 - 2012 Prieco, S.A. All rights reserved.
+ * @license     http://www.gnu.org/licenses/gpl-3.0.html GNU/GPL
+ * @link        http://www.extly.com http://support.extly.com http://www.prieco.com
  */
+// No direct access
+// defined('_JEXEC') or die('Restricted index access');
 
-// Provides access to app specific values such as your app id and app secret.
-// Defined in 'AppInfo.php'
-require_once('AppInfo.php');
+require_once dirname(__FILE__) . DIRECTORY_SEPARATOR . 'facebook-php-sdk/facebook.php';
+require_once dirname(__FILE__) . DIRECTORY_SEPARATOR . 'facebookapp.php';
 
-// Enforce https on production
-if (substr(AppInfo::getUrl(), 0, 8) != 'https://' && $_SERVER['REMOTE_ADDR'] != '127.0.0.1') {
-  header('Location: https://'. $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']);
-  exit();
-}
+/*
 
-// This provides access to helper functions defined in 'utils.php'
-require_once('utils.php');
+----------------------------------------------------------------------
+--- EXPERTS MODE ONLY -------------
+----------------------------------------------------------------------
 
+define('MY_APP_ID', 'YOUR APP_ID HERE');
+define('MY_APP_SECRET', 'YOUR APP_SECRET HERE');
+define('MY_CANVAS_PAGE', 'http://apps.facebook.com/your-app-here');
 
-/*****************************************************************************
- *
- * The content below provides examples of how to fetch Facebook data using the
- * Graph API and FQL.  It uses the helper functions defined in 'utils.php' to
- * do so.  You should change this section so that it prepares all of the
- * information that you want to display to the user.
- *
- ****************************************************************************/
+These constants are a second way to define the parameters for every
+channel using this app. In general, there's no need of constants
+definition. They are provided only if you want to fix the values.
+For example, in our Facebook App, used by several different users.
 
-require_once('sdk/src/facebook.php');
+The usual AutoTweetNG authorization workflow is from AutoTweetNG's
+backend. When you create a channel, you select "Own App"=Yes, fill
+"App ID", "App Secret", "Canvas URL", and press *"Authorize
+application and grant Permissions"* button.
 
-$facebook = new Facebook(array(
-  'appId'  => AppInfo::appID(),
-  'secret' => AppInfo::appSecret(),
-  'sharedSession' => true,
-  'trustForwarded' => true,
-));
+http://www.extly.com/how-to-autotweet-from-your-own-facebook-app.html#/facebook-add-account-with-your-own-app
 
-$user_id = $facebook->getUser();
-if ($user_id) {
-  try {
-    // Fetch the viewer's basic information
-    $basic = $facebook->api('/me');
-  } catch (FacebookApiException $e) {
-    // If the call fails we check if we still have a user. The user will be
-    // cleared if the error is because of an invalid accesstoken
-    if (!$facebook->getUser()) {
-      header('Location: '. AppInfo::getUrl($_SERVER['REQUEST_URI']));
-      exit();
-    }
-  }
+*/
 
-  // This fetches some things that you like . 'limit=*" only returns * values.
-  // To see the format of the data you are retrieving, use the "Graph API
-  // Explorer" which is at https://developers.facebook.com/tools/explorer/
-  $likes = idx($facebook->api('/me/likes?limit=4'), 'data', array());
+// To show debugging information
+define('DEBUG_ENABLED', false);
 
-  // This fetches 4 of your friends.
-  $friends = idx($facebook->api('/me/friends?limit=4'), 'data', array());
-
-  // And this returns 16 of your photos.
-  $photos = idx($facebook->api('/me/photos?limit=16'), 'data', array());
-
-  // Here is an example of a FQL call that fetches all of your friends that are
-  // using this app
-  $app_using_friends = $facebook->api(array(
-    'method' => 'fql.query',
-    'query' => 'SELECT uid, name FROM user WHERE uid IN(SELECT uid2 FROM friend WHERE uid1 = me()) AND is_app_user = 1'
-  ));
-}
-
-// Fetch the basic info of the app that they are using
-$app_info = $facebook->api('/'. AppInfo::appID());
-
-$app_name = idx($app_info, 'name', '');
-
+$facebookapp = new FacebookApp;
+$ok = $facebookapp->init();
 ?>
 <!DOCTYPE html>
-<html xmlns:fb="http://ogp.me/ns/fb#" lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=2.0, user-scalable=yes" />
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>AutoTweetNG Connector</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="description" content="">
+        <meta name="author" content="">
 
-    <title><?php echo he($app_name); ?></title>
-    <link rel="stylesheet" href="stylesheets/screen.css" media="Screen" type="text/css" />
-    <link rel="stylesheet" href="stylesheets/mobile.css" media="handheld, only screen and (max-width: 480px), only screen and (max-device-width: 480px)" type="text/css" />
+        <!-- Le styles -->
+        <link href="css/bootstrap.min.css" rel="stylesheet">
+		<link href="css/font-awesome.css" rel="stylesheet">
 
-    <!--[if IEMobile]>
-    <link rel="stylesheet" href="mobile.css" media="screen" type="text/css"  />
-    <![endif]-->
+        <!-- Le HTML5 shim, for IE6-8 support of HTML5 elements -->
+        <!--[if lt IE 9]>
+          <script src="http://html5shim.googlecode.com/svn/trunk/html5.js"></script>
+        <![endif]-->
 
-    <!-- These are Open Graph tags.  They add meta data to your  -->
-    <!-- site that facebook uses when your content is shared     -->
-    <!-- over facebook.  You should fill these tags in with      -->
-    <!-- your data.  To learn more about Open Graph, visit       -->
-    <!-- 'https://developers.facebook.com/docs/opengraph/'       -->
-    <meta property="og:title" content="<?php echo he($app_name); ?>" />
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content="<?php echo AppInfo::getUrl(); ?>" />
-    <meta property="og:image" content="<?php echo AppInfo::getUrl('/logo.png'); ?>" />
-    <meta property="og:site_name" content="<?php echo he($app_name); ?>" />
-    <meta property="og:description" content="My first app" />
-    <meta property="fb:app_id" content="<?php echo AppInfo::appID(); ?>" />
+        <!-- Le fav and touch icons -->
+        <link rel="shortcut icon" href="ico/favicon.ico">
 
-    <script type="text/javascript" src="/javascript/jquery-1.7.1.min.js"></script>
+        <link rel="apple-touch-icon-precomposed" sizes="144x144" href="ico/apple-touch-icon-144-precomposed.png">
+        <link rel="apple-touch-icon-precomposed" sizes="114x114" href="ico/apple-touch-icon-114-precomposed.png">
+        <link rel="apple-touch-icon-precomposed" sizes="72x72" href="ico/apple-touch-icon-72-precomposed.png">
+        <link rel="apple-touch-icon-precomposed" href="ico/apple-touch-icon-57-precomposed.png">
 
-    <script type="text/javascript">
-      function logResponse(response) {
-        if (console && console.log) {
-          console.log('The response was', response);
-        }
-      }
+    </head>
 
-      $(function(){
-        // Set up so we handle click on the buttons
-        $('#postToWall').click(function() {
-          FB.ui(
-            {
-              method : 'feed',
-              link   : $(this).attr('data-url')
-            },
-            function (response) {
-              // If response is null the user canceled the dialog
-              if (response != null) {
-                logResponse(response);
-              }
-            }
-          );
-        });
+    <body>
 
-        $('#sendToFriends').click(function() {
-          FB.ui(
-            {
-              method : 'send',
-              link   : $(this).attr('data-url')
-            },
-            function (response) {
-              // If response is null the user canceled the dialog
-              if (response != null) {
-                logResponse(response);
-              }
-            }
-          );
-        });
-
-        $('#sendRequest').click(function() {
-          FB.ui(
-            {
-              method  : 'apprequests',
-              message : $(this).attr('data-message')
-            },
-            function (response) {
-              // If response is null the user canceled the dialog
-              if (response != null) {
-                logResponse(response);
-              }
-            }
-          );
-        });
-      });
-    </script>
-
-    <!--[if IE]>
-      <script type="text/javascript">
-        var tags = ['header', 'section'];
-        while(tags.length)
-          document.createElement(tags.pop());
-      </script>
-    <![endif]-->
-  </head>
-  <body style='background-color:black'>
-    <div id="fb-root"></div>
-    <script type="text/javascript">
-      window.fbAsyncInit = function() {
-        FB.init({
-          appId      : '<?php echo AppInfo::appID(); ?>', // App ID
-          channelUrl : '//<?php echo $_SERVER["HTTP_HOST"]; ?>/channel.html', // Channel File
-          status     : true, // check login status
-          cookie     : true, // enable cookies to allow the server to access the session
-          xfbml      : true // parse XFBML
-        });
-
-        // Listen to the auth.login which will be called when the user logs in
-        // using the Login button
-        FB.Event.subscribe('auth.login', function(response) {
-          // We want to reload the page now so PHP can read the cookie that the
-          // Javascript SDK sat. But we don't want to use
-          // window.location.reload() because if this is in a canvas there was a
-          // post made to this page and a reload will trigger a message to the
-          // user asking if they want to send data again.
-          window.location = window.location;
-        });
-
-        FB.Canvas.setAutoGrow();
-      };
-
-      // Load the SDK Asynchronously
-      (function(d, s, id) {
-        var js, fjs = d.getElementsByTagName(s)[0];
-        if (d.getElementById(id)) return;
-        js = d.createElement(s); js.id = id;
-        js.src = "//connect.facebook.net/en_US/all.js";
-        fjs.parentNode.insertBefore(js, fjs);
-      }(document, 'script', 'facebook-jssdk'));
-    </script>
-
-    <header class="clearfix">
-      <?php if (isset($basic)) { ?>
-      <p id="picture" style="background-image: url(https://graph.facebook.com/<?php echo he($user_id); ?>/picture?type=normal)"></p>
-
-      <div>
-        <h1>Welcome, <strong><?php echo he(idx($basic, 'name')); ?></strong></h1>
-        <p class="tagline">
-          This is your app
-          <a href="<?php echo he(idx($app_info, 'link'));?>" target="_top"><?php echo he($app_name); ?></a>
-        </p>
-
-        <div id="share-app">
-          <p>Share your app:</p>
-          <ul>
-            <li>
-              <a href="#" class="facebook-button" id="postToWall" data-url="<?php echo AppInfo::getUrl(); ?>">
-                <span class="plus">Post to Wall</span>
-              </a>
-            </li>
-            <li>
-              <a href="#" class="facebook-button speech-bubble" id="sendToFriends" data-url="<?php echo AppInfo::getUrl(); ?>">
-                <span class="speech-bubble">Send Message</span>
-              </a>
-            </li>
-            <li>
-              <a href="#" class="facebook-button apprequests" id="sendRequest" data-message="Test this awesome app">
-                <span class="apprequests">Send Requests</span>
-              </a>
-            </li>
-          </ul>
+        <div class="jumbotron masthead">
+            <div class="container-fluid">
+                <p><br/></p>
+                <h1><img src="ico/isologo-autotweet-20120831-75.png"/> AutoTweet NG Connector</h1>
+                <p><br/></p>
+            </div>
         </div>
-      </div>
-      <?php } else { ?>
-      <div>
-        <h1>Welcome</h1>
-        <div class="fb-login-button" data-scope="user_likes,user_photos"></div>
-      </div>
-      <?php } ?>
-    </header>
 
-    <section id="get-started">
-      <p>Welcome to your Facebook app, running on <span>heroku</span>!</p>
-      <a href="https://devcenter.heroku.com/articles/facebook" target="_top" class="button">Learn How to Edit This App</a>
-    </section>
+        <div class="container-fluid">
 
-    <?php
-      if ($user_id) {
-    ?>
+            <div class="row-fluid">
+                <div class="span12">
 
-    <section id="samples" class="clearfix">
-      <h1>Examples of the Facebook Graph API</h1>
+					<?php
 
-      <div class="list">
-        <h3>A few of your friends</h3>
-        <ul class="friends">
-          <?php
-            foreach ($friends as $friend) {
-              // Extract the pieces of info we need from the requests above
-              $id = idx($friend, 'id');
-              $name = idx($friend, 'name');
-          ?>
-          <li>
-            <a href="https://www.facebook.com/<?php echo he($id); ?>" target="_top">
-              <img src="https://graph.facebook.com/<?php echo he($id) ?>/picture?type=square" alt="<?php echo he($name); ?>">
-              <?php echo he($name); ?>
-            </a>
-          </li>
-          <?php
-            }
-          ?>
-        </ul>
-      </div>
+					$ref = filter_input(INPUT_SERVER, 'HTTP_REFERER', FILTER_SANITIZE_URL);
+					if (!preg_match('/^http(s?):\/\/apps.facebook.com/', $ref))
+					{
+						echo '<div class="alert alert-block alert-error">
+							<button data-dismiss="alert" class="close" type="button">×</button>';
+						echo '<p><i class="icon-fire"></i> Please, don\'t access the app directly from your browser.</p>
+							<ul><li>You must call <b>AutoTweet NG Connector</b>
+							from <b>AutoTweet</b> component backend in Joomla, clicking on
+							the <b>Authorization Button</b>.</li>
+							</ul>';
+						echo '</div>';
+					}
 
-      <div class="list inline">
-        <h3>Recent photos</h3>
-        <ul class="photos">
-          <?php
-            $i = 0;
-            foreach ($photos as $photo) {
-              // Extract the pieces of info we need from the requests above
-              $id = idx($photo, 'id');
-              $picture = idx($photo, 'picture');
-              $link = idx($photo, 'link');
+					if (!$ok)
+					{
+						echo '<div class="alert alert-block alert-error">
+							<button data-dismiss="alert" class="close" type="button">×</button>';
+						echo '<p><i class="icon-fire"></i> Wrong parameters:</p>
+							<ul><li>You must call <b>AutoTweet NG Connector</b>
+							from <b>AutoTweet</b> component backend in Joomla, clicking on
+							the <b>Authorization Button</b>, or</li>
+							<li>You must define MY_APP_ID, and MY_APP_SECRET in the Facebook App index.php.</li>
+							</ul>';
+						echo '</div>';
+					}
+					else
+					{
 
-              $class = ($i++ % 4 === 0) ? 'first-column' : '';
-          ?>
-          <li style="background-image: url(<?php echo he($picture); ?>);" class="<?php echo $class; ?>">
-            <a href="<?php echo he($link); ?>" target="_top"></a>
-          </li>
-          <?php
-            }
-          ?>
-        </ul>
-      </div>
+						if (!$facebookapp->login())
+						{
+							?>
+							<p><i class="icon-info-sign"></i> This application connects your account to your Joomla! AutoTweet NG installation.</p>
+							<p>To post status messages from Joomla! to your
+								<b>Facebook Status</b> (personal profile, Facebook page,
+								group or event) you must <b>add this application and grant
+									extended permissions</b> for AutoTweet.</p>
+							<p><br/></p>
+							<?php
+							// Redirect to login and authorization
+							echo '<a class="btn btn-info" onclick="top.location.href =\'' . $facebookapp->login_url . '\';" href="#">Authorize!</a>';
+						}
+						else
+						{
+							// Login Ok
+							try
+							{
 
-      <div class="list">
-        <h3>Things you like</h3>
-        <ul class="things">
-          <?php
-            foreach ($likes as $like) {
-              // Extract the pieces of info we need from the requests above
-              $id = idx($like, 'id');
-              $item = idx($like, 'name');
+								$facebookapp->facebook->setExtendedAccessToken();
+								$extended_token = $_SESSION['fb_' . $facebookapp->APP_ID . '_access_token'];
 
-              // This display's the object that the user liked as a link to
-              // that object's page.
-          ?>
-          <li>
-            <a href="https://www.facebook.com/<?php echo he($id); ?>" target="_top">
-              <img src="https://graph.facebook.com/<?php echo he($id) ?>/picture?type=square" alt="<?php echo he($item); ?>">
-              <?php echo he($item); ?>
-            </a>
-          </li>
-          <?php
-            }
-          ?>
-        </ul>
-      </div>
+								if (!$extended_token)
+								{
+									echo '<div class="alert alert-block alert-error">
+										<button data-dismiss="alert" class="close" type="button">×</button>';
+									echo '<p><i class="icon-fire"></i>
+										Error getExtendedAccessToken</p>';
+									echo '</div>';
+								}
 
-      <div class="list">
-        <h3>Friends using this app</h3>
-        <ul class="friends">
-          <?php
-            foreach ($app_using_friends as $auf) {
-              // Extract the pieces of info we need from the requests above
-              $id = idx($auf, 'uid');
-              $name = idx($auf, 'name');
-          ?>
-          <li>
-            <a href="https://www.facebook.com/<?php echo he($id); ?>" target="_top">
-              <img src="https://graph.facebook.com/<?php echo he($id) ?>/picture?type=square" alt="<?php echo he($name); ?>">
-              <?php echo he($name); ?>
-            </a>
-          </li>
-          <?php
-            }
-          ?>
-        </ul>
-      </div>
-    </section>
+								$signed_request = $facebookapp->facebook->getSignedRequest();
+								$exp = $signed_request['expires'];
 
-    <?php
-      }
-    ?>
+								$user = $facebookapp->facebook->api('/me');
+								$pages = $facebookapp->facebook->api('/me/accounts');
+								$groups = $facebookapp->facebook->api('/me/groups');
+								$events = $facebookapp->facebook->api('/me/events');
 
-    <section id="guides" class="clearfix">
-      <h1>Learn More About Heroku &amp; Facebook Apps</h1>
-      <ul>
-        <li>
-          <a href="https://www.heroku.com/?utm_source=facebook&utm_medium=app&utm_campaign=fb_integration" target="_top" class="icon heroku">Heroku</a>
-          <p>Learn more about <a href="https://www.heroku.com/?utm_source=facebook&utm_medium=app&utm_campaign=fb_integration" target="_top">Heroku</a>, or read developer docs in the Heroku <a href="https://devcenter.heroku.com/" target="_top">Dev Center</a>.</p>
-        </li>
-        <li>
-          <a href="https://developers.facebook.com/docs/guides/web/" target="_top" class="icon websites">Websites</a>
-          <p>
-            Drive growth and engagement on your site with
-            Facebook Login and Social Plugins.
-          </p>
-        </li>
-        <li>
-          <a href="https://developers.facebook.com/docs/guides/mobile/" target="_top" class="icon mobile-apps">Mobile Apps</a>
-          <p>
-            Integrate with our core experience by building apps
-            that operate within Facebook.
-          </p>
-        </li>
-        <li>
-          <a href="https://developers.facebook.com/docs/guides/canvas/" target="_top" class="icon apps-on-facebook">Apps on Facebook</a>
-          <p>Let users find and connect to their friends in mobile apps and games.</p>
-        </li>
-      </ul>
-    </section>
-  </body>
+								echo '<div class="alert alert-info">';
+								echo '<h2>Congratulations!</h2>';
+								echo '<p><i class="icon-check"></i> You have authorized the application and granted the permissions.</p>';
+								echo '<p>Now, you can create the <b>Facebook channel</b> in
+									AutoTweet component backend, and select your Profile, App,
+									Page, Group or Event. <i class="icon-hand-right"></i></p>';
+								echo '<p><em>Please, copy and paste
+									<span class="label label-info">User-ID</span> and
+									<span class="label label-info">Access Token</span>
+									in the new AutoTweet\'s <b>Facebook Account</b>.</em></p>';
+								echo '</div>';
+								?>
+								<div class="facebook-tokens">
+									<ul class="nav nav-tabs" id="myTab">
+										<li class="active"><a data-toggle="tab" href="#home"><i class="icon-user"></i> Profile</a></li>
+										<li><a data-toggle="tab" href="#profile"><i class="icon-home"></i> Pages and apps</a></li>
+										<li><a data-toggle="tab" href="#groups"><i class="icon-group"></i> Groups</a></li>
+										<li><a data-toggle="tab" href="#events"><i class="icon-calendar"></i> Events</a></li>
+									</ul>
+									<div class="tab-content" id="myTabContent">
+										<div id="home" class="tab-pane fade in active">
+											<dl class="dl-horizontal">
+												<dt>User Name</dt>
+												<dd><?php echo $user['name']; ?></dd>
+												<dt>Access Token</dt>
+												<dd><small><?php echo $extended_token; ?></small></dd>
+											</dl>
+											<p><em>Please, copy and paste
+													<span class="label label-info">User-ID</span>
+													and <span class="label label-info">Access Token</span>
+													in the new AutoTweet's <b>Facebook Account</b>.</em></p>
+											<p><br/><br/></p>
+										</div>
+										<div id="profile" class="tab-pane fade">
+											<table class="table">
+												<thead>
+													<tr>
+														<th>Name</th>
+													</tr>
+												</thead>
+												<tbody>
+													<?php
+													foreach ($pages['data'] as $page)
+													{
+														echo '<tr><td>' . $page['name'] . '</td></tr>';
+													}
+													?>
+												</tbody>
+											</table>
+										</div>
+										<div id="groups" class="tab-pane fade">
+											<table class="table">
+												<thead>
+													<tr>
+														<th>Name</th>
+													</tr>
+												</thead>
+												<tbody>
+			<?php
+			foreach ($groups['data'] as $group)
+			{
+				echo '<tr><td>' . $group['name'] . '</td></tr>';
+			}
+			?>
+												</tbody>
+											</table>
+										</div>
+										<div id="events" class="tab-pane fade">
+											<table class="table">
+												<thead>
+													<tr>
+														<th>Name</th>
+													</tr>
+												</thead>
+												<tbody>
+			<?php
+			foreach ($events['data'] as $event)
+			{
+				echo '<tr><td>' . $event['name'] . '</td></tr>';
+			}
+			?>
+												</tbody>
+											</table>
+										</div>
+									</div>
+								</div>
+								<?php
+							}
+							catch (facebookphpsdk\FacebookApiException $e)
+							{
+								echo '<div class="alert alert-block alert-error">
+									<button data-dismiss="alert" class="close" type="button">×</button>
+									<i class="icon-fire"></i> Error: ';
+								echo $e;
+								echo '</div>';
+							}
+						}
+					}
+					?>
+
+                </div>
+            </div>
+
+            <p><br/><br/><br/><br/><br/><br/><br/><br/><br/></p>
+            <hr class="soften">
+
+        </div>
+
+        <!-- Footer
+        ================================================== -->
+        <footer class="footer">
+            <div class="container-fluid">
+                <p class="pull-right"><a href="#">Back to top</a></p>
+                <p>Additional information about AutoTweet: <a href="http://www.extly.com/" target="_blank">Extly.com - Joomla Extensions</a></p>
+                <p>For more information:
+					<a href="http://www.extly.com/autotweet-ng-user-documentation.html" target="_blank">AutoTweet Documentation</a></p>
+                <p>Support: <a href="http://support.extly.com" target="_blank">http://support.extly.com</a></p>
+                <ul class="footer-links">
+                    <li><a href="http://www.extly.com/blog.html" target="_blank">Read the Extly.com blog</a></li>
+                    <li><a href="http://support.extly.com" target="_blank">Submit issues</a></li>
+                    <li><a href="http://support.extly.com/projects/autotweet_ng_pro/issues" target="_blank">Roadmap and changelog</a></li>
+                </ul>
+            </div>
+        </footer>
+
+        <!-- Le javascript
+        ================================================== -->
+        <!-- Placed at the end of the document so the pages load faster -->
+        <script src="js/jquery.js"></script>
+        <script src="js/bootstrap.min.js"></script>
+    </body>
 </html>
